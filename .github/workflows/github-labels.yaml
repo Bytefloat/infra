@@ -1,0 +1,34 @@
+name: GitHub Lint / Labels
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/github-labels.yaml'
+      - 'github/labels/**.tf'
+      - 'github/labels/**.lock.hcl'
+  pull_request:
+    paths:
+      - '.github/workflows/github-labels.yaml'
+      - 'github/labels/**.tf'
+      - 'github/labels/**.lock.hcl'
+  schedule:
+    - cron: "30 4 * * *" # UTC time
+  workflow_run:
+    workflows: [GitHub Lint / Repos]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    name: Terraform
+    uses: XNXKTech/workflows/.github/workflows/terraform.yml@main
+    with:
+      directory: "['github/labels']"
+      timeout: 90
+    secrets:
+      GH_TOKEN: ${{ secrets.CI_PAT }}
+      TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+      TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}

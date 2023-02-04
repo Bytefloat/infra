@@ -17,8 +17,15 @@ on:
     - cron: "0 4 * * *" # UTC time
   workflow_dispatch:
 
+permissions: write-all
+
 env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.ACTIONS_BOT_TOKEN }}
+  TF_CLI_ARGS_fmt: -check
+  TF_CLI_ARGS_init: -input=false
+  TF_CLI_ARGS_validate: -no-color
+  TF_CLI_ARGS_plan: -no-color -input=false -lock=false
+  TF_CLI_ARGS_apply: -no-color -input=false -lock=false -auto-approve -compact-warnings
   TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
   TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
   TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform.d/plugin-cache
@@ -58,15 +65,15 @@ jobs:
 
       - name: Terraform Init
         id: init
-        run: terraform init -input=false
+        run: terraform init
 
       - name: Terraform Validate
         id: validate
-        run: terraform validate -no-color
+        run: terraform validate
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -no-color -input=false
+        run: terraform plan
         continue-on-error: true
 
       - name: Update Pull Request
@@ -77,6 +84,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            emoji = ("${{ steps.plan.outcome }}" === "success") ? '✅' : '❌'
             // 1. Retrieve existing bot comments for the PR
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -84,23 +92,22 @@ jobs:
               issue_number: context.issue.number,
             })
             const botComment = comments.find(comment => {
-              return comment.body.includes('Terraform Format and Style')
+              return comment.body.includes('${{ github.workflow }} - ${{ matrix.directory }}')
             })
-
             // 2. Prepare format of the comment
-            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
-            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
-            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
-            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
-
+            const output = `### <span aria-hidden="true">${emoji}</span> ${{ github.workflow }} - ${{ matrix.directory }}
+            |  Name | Status |
+            |---------------------------------|------------------------|
+            |<span aria-hidden="true">🖌</span> Format and Style | \`${{ steps.fmt.outcome }}\` |
+            |<span aria-hidden="true">⚙️</span> Initialization | \`${{ steps.init.outcome }}\` |
+            |<span aria-hidden="true">🤖</span> Validation | \`${{ steps.validate.outcome }}\` |
+            |<span aria-hidden="true">📖</span> Plan | \`${{ steps.plan.outcome }}\` |
+            ---
             <details><summary>Show Plan</summary>
-
-            \`\`\`${process.env.PLAN}\`\`\`
-
-            </details>
-
-            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`, Working Directory: \`${{ github.action_path }}\`, Workflow: \`${{ github.workflow }}\`*`;
-
+            \`\`\`terraform
+            ${process.env.PLAN}
+            \`\`\`
+            </details>`;
             // 3. If we have a comment, update it, otherwise create a new one
             if (botComment) {
               github.rest.issues.updateComment({
@@ -117,12 +124,11 @@ jobs:
                 body: output
               })
             }
-
-      - name: Terraform Plan Status
+      - name: Plan Status
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      - name: Apply
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' || contains(steps.plan.outputs.stdout,'No changes.') == false && github.ref == 'refs/heads/main' && github.event_name == 'push'
         id: apply
-        run: terraform apply -auto-approve -no-color -input=false
+        run: terraform apply

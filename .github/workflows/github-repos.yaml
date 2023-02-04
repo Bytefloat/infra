@@ -1,0 +1,29 @@
+name: GitHub Lint / Repos
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/github-repos.yaml'
+      - 'github/repos/**.tf'
+      - 'github/repos/**.lock.hcl'
+  pull_request:
+    paths:
+      - '.github/workflows/github-repos.yaml'
+      - 'github/repos/**.tf'
+      - 'github/repos/**.lock.hcl'
+  schedule:
+    - cron: "0 4 * * *" # UTC time
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    name: Terraform
+    uses: XNXKTech/workflows/.github/workflows/terraform.yml@main
+    with:
+      directory: "['github/repos']"
+    secrets:
+      GH_TOKEN: ${{ secrets.ACTIONS_BOT_TOKEN }}
+      TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+      TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}

@@ -1,0 +1,35 @@
+name: GitHub Lint / Teams
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - '.github/workflows/github-teams.yaml'
+      - 'github/teams/**.tf'
+      - 'github/teams/**.lock.hcl'
+  pull_request:
+    paths:
+      - '.github/workflows/github-teams.yaml'
+      - 'github/teams/**.tf'
+      - 'github/teams/**.lock.hcl'
+  schedule:
+    - cron: "30 4 * * *" # UTC time
+  workflow_run:
+    workflows: [GitHub Lint / Repos]
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  terraform:
+    name: Terraform
+    uses: XNXKTech/workflows/.github/workflows/terraform.yml@main
+    with:
+      timeout: 30
+      directory: "['github/teams']"
+      env: TF_VAR_organization=Bytefloat
+    secrets:
+      GH_TOKEN: ${{ secrets.CI_PAT }}
+      TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+      TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
